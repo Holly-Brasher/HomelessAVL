@@ -1,0 +1,280 @@
+---
+title: "Homelessness in Asheville"
+author: "Holly Brasher"
+date: "`r Sys.Date()`"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+    theme: sandstone
+    
+runtime: shiny
+---
+
+```{r setup, echo=FALSE}
+library(flexdashboard)
+library(rio)
+library(here)
+library(tidyverse)
+library(flexdashboard)
+library(shiny)
+library(plotly)
+library(RColorBrewer)
+library(png)
+library(grid)
+
+apdpi<-read_csv("apdpi.csv")
+
+hso<-apdpi%>%
+  as_tibble()%>%
+  select(c(lat, lon, offense_long_description, year_occurred))
+
+ncpit21 <- read_csv("ncpit21.csv")
+ncdesc21<-ncpit21[order(-ncpit21$`Overall Homeless 2021`),]
+
+totals<-ncdesc21[c(2,5)]
+
+nclong21<-ncdesc21 %>%
+  pivot_longer(
+    cols=7:9, 
+    names_to = "Age", 
+    values_to = "Total")
+nclong21<-nclong21[-c(7:351)]
+
+nclong21$Name<-nclong21$`CoC Name`
+nclong21<-nclong21[order(-nclong21$`Overall Homeless 2021`),]
+
+ncpit21ES <- read_csv("ncpit21ES.csv")
+ncpit21ES$CoC<-gsub(' CoC','',ncpit21ES$`CoC Name`)
+
+ncpit21ES$subcategory <- factor(ncpit21ES$subcategory, levels = c("Sheltered ES Homeless - Over 24 2021", "Sheltered ES Homeless - Under 18 2021", "Sheltered ES Homeless - Age 18 to 24 2021", "Sheltered ES Homeless - Male 2021", "Sheltered ES Homeless - Female 2021", "Sheltered ES Homeless - Transgender 2021", "Sheltered ES Homeless - Gender Non-Conforming 2021", "Sheltered ES Homeless - Non-Hispanic/Non-Latino 2021", "Sheltered ES Homeless - Black or African American 2021", "Sheltered ES Homeless - Hispanic/Latino 2021", "Sheltered ES Homeless - White 2021", "Sheltered ES Homeless - Asian 2021", "Sheltered ES Homeless - American Indian or Alaska Native 2021", "Sheltered ES Homeless - Native Hawaiian or Other Pacific Island","Sheltered ES Homeless - Multiple Races 2021"))
+
+pal <- c("#9af188", "#247256", "#e11e68", "#c57316", "#DAF7A6","#FFCC33", "#40E0D0", "#FF7F50", "#6495ED", "#08ef0c", "#CCCCFF", "#c57316", "#5faee9", "#dc3f60", "#DFFF00")
+pal <- setNames(pal, c("Sheltered ES Homeless - Over 24 2021", "Sheltered ES Homeless - Age 18 to 24 2021", "Sheltered ES Homeless - Under 18 2021", "Sheltered ES Homeless - Male 2021", "Sheltered ES Homeless - Female 2021", "Sheltered ES Homeless - Transgender 2021", "Sheltered ES Homeless - Gender Non-Conforming 2021", "Sheltered ES Homeless - Non-Hispanic/Non-Latino 2021", "Sheltered ES Homeless - Black or African American 2021", "Sheltered ES Homeless - Hispanic/Latino 2021", "Sheltered ES Homeless - White 2021", "Sheltered ES Homeless - Asian 2021", "Sheltered ES Homeless - American Indian or Alaska Native 2021", "Sheltered ES Homeless - Native Hawaiian or Other Pacific Island","Sheltered ES Homeless - Multiple Races 2021"))
+m <- list(b = 200, t = 10)
+#ui <- fluidPage(
+#,
+#  mainPanel(plotlyOutput(outputId = "p", height="80%")
+#))
+#server <- function(input, output, ...) {
+#  output$p <- 
+
+avlrace <- read_csv("avlrace.csv")
+race<-avlrace%>%  filter(Main != "Sheltered Emergency" & Main != "Total Sheltered" & Main != "Sheltered Transitional")
+race$subcategory<-as.ordered(race$subcategory)
+
+```
+POINT IN TIME DATA-ASHEVILLE
+===================================== 
+
+Column {.sidebar}
+------------------------------
+#### Measuring Homelessness
+
+Homelessness is a difficult phenomenon to measure. The best known data on homelessness is likely the Point-in-Time Count and Housing Inventory Count PIT) data required for any city that receives funding from HUD. But it is a snapshot, and is subject to significant measurement error. Data may be collected over one day or seven days or a combination of the two. It may be collected for a Continuum of Care (CoC) location or from a Homeless Management Information System (HMIS). It may also be a sample or a census or a combination of the two.
+
+This dashboard produces a picture of homelessness in Asheville by drawing on the PIT data, but also other indirect measures -- such as public safety data on trespassing, loitering, or vagrancy.
+
+It also covers the transition of many residential properties from long term rental to short term rental. This has reduced the units available for permanent residents. 
+
+Row
+----------------------------------
+### Counts of Homeless in Asheville by Housing Status, Category, and Race
+```{r}
+renderPlotly({
+  plot_ly(race, r = ~Count, theta = ~Main, type="barpolar", 
+               color = ~subcategory,  
+               marker =list(colorscale = 'Paired'),
+            hoverinfo = "text",
+            text = ~ paste("<br>Category:", Category,
+                "<br>Subcategory:", subcategory,
+                "<br>Count:", Count)) %>%    
+  layout(legend=list(orientation = "v", yanchor = "left", 
+                     title=list(text='Race')),  
+         plot_bgcolor='#e5ecf6',   
+         xaxis = list(   
+           zerolinecolor = '#ffff',   
+           zerolinewidth = 2,   
+           gridcolor = 'ffff'),   
+         xaxis = list(   
+           zerolinecolor = '#ffff',   
+           zerolinewidth = 2,   
+           gridcolor = 'ffff') , polar = list(angularaxis = list( 
+             rotation = 90, 
+             direction = 'clockwise' 
+           )), margin = 0.01) 
+  })
+```
+
+### Emergency and Transitional Shelter Counts by Age, Gender, Individual or Family, and Veteran Status
+```{r}
+avlagegender <- read_csv("avlagegender.csv")
+#library(RColorBrewer)
+
+p1<-ggplot(avlagegender, aes(x = Main, y=Total,  fill = Subcategory)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values=c("#9af188", "#247256", "#e11e68", "#c57316", "#DAF7A6","#FFCC33", "#40E0D0", "#FF7F50", "#6495ED")) +
+  facet_wrap(vars(Status,Category), strip.position = "bottom", nrow=1) +
+  geom_vline(xintercept=c(0.5, 6.5),color="grey92")+
+  theme_bw(base_size = 10) +
+  theme(panel.spacing = unit(0, "lines"),
+        strip.background = element_rect(color = "grey92", size = 0, fill = "white"),
+        strip.placement = "outside",
+        legend.position = 'top',
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_line(colour = "grey"),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3),
+        panel.border = element_rect(color = "black", fill = NA, size = 0),
+        panel.background = element_rect(fill = "white"))
+                       
+ggplotly(p1)
+```
+POINT IN TIME DATA-NORTH CAROLINA
+==================================
+
+## Column  {.sidebar}
+
+#### Emergency Shelter Counts by Continuum of Care in North Carolina
+
+These are the twelve communities that are designated as Continuum of Care locations for the PIT counts for North Carolina. The bar chart shows the counts for the homeless that are in emergency shelters at the time of the count. Those in emergency shelters are the largest group in the PIT totals. The other two smaller categories for housing status are transitional housing, and unsheltered. The table below the bar chart shows the total homeless counts for all three categories for each community for 2021.
+
+Select from the dropdown menu below to see the counts in emergency shelters by age, gender, and race.
+
+```{r}
+  selectizeInput(
+    inputId = "categories", 
+    label = HTML("<b>Select a Category</b>"), 
+    choices = unique(ncpit21ES$category), 
+    selected = "Age",
+    multiple = FALSE
+  )
+```
+
+Column
+------------------------------------------------------------
+### The State of North Carolina Point in Time Counts for Homeless in Emergency Shelters (ES)
+
+```{r}
+
+
+renderPlotly({
+    plot_ly(ncpit21ES, x = ~CoC, y = ~Totals, color = ~subcategory, text = ~subcategory,
+           hovertemplate = paste('<b>%{text}</b>', 
+                                 '<br><b>Total</b>: %{y}<br>', 
+                                 '<i>CoC</i>: %{x}'), 
+               colors = pal) %>%
+      filter(category %in% input$categories) %>%
+      group_by(category) %>%
+      add_bars()%>% layout(bargap=0) %>% 
+  layout(xaxis = list(categoryorder = "total descending"), autosize = T, legend = list(orientation = "h", x = 0.2, y = 1)) %>% 
+  config(displayModeBar = FALSE)
+  })
+#}
+
+#shinyApp(ui, server)
+```
+
+
+
+
+### Point in Time Totals by Continuum of Care Location
+
+```{r}
+knitr::kable(totals)
+
+```
+
+
+
+
+
+# Homeless Status Offenses{data-navmenu="Indicators"}
+
+Column {.sidebar}
+------------------------------
+
+### Homeless Status Offenses
+One alternative to the Point in Time counts is public safety data. As Burton, Pollio, and North (2018) explain, "it is well established that homelessness is associated with crime. Previous research suggests that this association is at least partially secondary to homeless status offenses (eg, vagrancy and trespassing resulting from behaviors intrinsic to homelessness)."[1] This visualization explores that set of incidents using the incidents dataset from Asheville's Open Data Portal.[2] The location of the incidents are anonymized and are therefore not identified by conventional latitude and longitude. A scatterplot uses the relative location of the incidents, represented at the block level.
+[1]https://pubmed.ncbi.nlm.nih.gov/30372505/
+[2] APD Public Incidents https://data-avl.opendata.arcgis.com/datasets/fa266be763124be89fee8c1fd99f88ff_0/explore?location=34.696056%2C-83.970300%2C9.15
+
+```{r}
+hso_scatter<-function(hso, offense_type, min, max) {
+  
+  if(offense_type=="ALL") {
+    scatterPlot <-hso%>%
+      ggplot(aes(x   = lat,
+                 y   = lon,
+                 color = offense_long_description))+
+      geom_point()+
+      theme_minimal() +
+      labs(title= "Location of Incidents")
+    
+  } else {
+    scatterPlot <-hso%>%
+      filter(offense_long_description %in% offense_type)%>%
+      ggplot(aes(x   = lat,
+                 y   = lon,
+                 color = offense_long_description))+
+      geom_point()+
+      theme_minimal() +
+      labs(title= "Location of Incidents")
+  }
+  return(scatterPlot)
+}
+
+  selectInput(inputId = "offense",
+                  label = "Incident Type",
+                  choices = c("TRESPASS", "LITTERING", "PANHANDLING", "HOMLESS CAMP", "ALL"),
+                  selected = "ALL")
+```
+
+Column
+------------------------------------------------------------
+### Homeless Status Offenses by Location and Incident Type
+```{r}
+renderPlot({
+    hso_scatter(hso,
+                offense_type = input$offense, hso$year_occurred >= input$slider[1]& hso$year_occurred <=input$slider[2],)
+  })
+  
+```
+
+### Total Homeless Status Offenses by Year
+
+```{r}
+library(gganimate)
+apdpi<-read_csv("apdpi.csv")
+apdpi$year<-as.factor(apdpi$year_occurred)
+
+p<-ggplot(apdpi, aes(x=lat, y=lon, color=year)) + geom_point() +
+  labs(title = "{closest_state}") +
+  transition_states(year, transition_length = 3, state_length = 1) +
+  enter_fade() +
+  exit_fade()
+
+animate(p)
+```
+
+
+# Housing Data{data-navmenu="Indicators"}
+
+```{r}
+
+```
+
+Column {data-width=350, .tabset}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r}
+
+```
+
+### Chart C
+
+```{r}
+
+```
+
