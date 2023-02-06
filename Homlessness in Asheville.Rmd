@@ -251,9 +251,6 @@ renderPlot({
 
 # Short Term Rentals and Point in Time Counts{data-navmenu="Other Indicators for Homelessness"}
 
-```{r}
-
-```
 
 Column 
 -----------------------------------------------------------------------
