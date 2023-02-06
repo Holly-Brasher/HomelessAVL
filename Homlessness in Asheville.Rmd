@@ -22,6 +22,13 @@ library(plotly)
 library(RColorBrewer)
 library(png)
 library(grid)
+library(scales)
+library(hrbrthemes)
+#remotes::install_github("r-dbi/RPostgres")
+#library(RPostgres)
+#library(DBI)
+library(dplyr)
+library(ggplot2)
 
 apdpi<-read_csv("apdpi.csv")
 
@@ -188,7 +195,7 @@ knitr::kable(totals)
 
 
 
-# Homeless Status Offenses{data-navmenu="Indicators"}
+# Homeless Status Offenses{data-navmenu="Other Indicators for Homelessness"}
 
 Column {.sidebar}
 ------------------------------
@@ -240,41 +247,71 @@ renderPlot({
   
 ```
 
-### Total Homeless Status Offenses by Year
-
-```{r}
-library(gganimate)
-apdpi<-read_csv("apdpi.csv")
-apdpi$year<-as.factor(apdpi$year_occurred)
-
-p<-ggplot(apdpi, aes(x=lat, y=lon, color=year)) + geom_point() +
-  labs(title = "{closest_state}") +
-  transition_states(year, transition_length = 3, state_length = 1) +
-  enter_fade() +
-  exit_fade()
-
-animate(p)
-```
 
 
-# Housing Data{data-navmenu="Indicators"}
+# Short Term Rentals and Point in Time Counts{data-navmenu="Other Indicators for Homelessness"}
 
 ```{r}
 
 ```
 
-Column {data-width=350, .tabset}
+Column 
 -----------------------------------------------------------------------
 
-### Chart B
+### Does Homelessness Increase when Short Term Rentals Increase?
+The only series that trends with an increase in short term rentals is the count for the unsheltered homeless population, but this does not establish a causal relationship. It may be driven by the Covid-19 pandemic, or other factors.
 
 ```{r}
 
+#con<-dbConnect(RPostgres::Postgres())
+#db <- 'hls'  #provide the name of your db
+#host_db <- 'localhost' #i.e. # i.e. 'ec2-54-83-201-96.compute-1.amazonaws.com'  
+#db_port <- '5432'  # or any other port specified by the DBA
+#db_user <- 'postgres'  
+#db_password <- 'tigers61'
+#con <- dbConnect(RPostgres::Postgres(), dbname = db, host=host_db, port=db_port, user=db_user, password=db_password)  
+
+#dbListTables(con) 
+
+#rentals<-dbGetQuery(con, "SELECT date_trunc('year', first_review) AS review_year, count(first_review) as reviews
+#           FROM rentals
+#           GROUP BY review_year")
+
+#abcpit<-dbGetQuery(con, "SELECT * FROM abcpit")
+
+
+
+#write.csv(rentals, "rentals.csv")
+#write.csv(abcpit, "abcpit.csv")
+
+rentals<-read.csv("rentals.csv")
+abcpit<-read.csv("abcpit.csv")
+
+rentals$Year<-as.numeric(format(rentals$review_year, format="%Y"))
+abcpit$Year<-as.numeric(abcpit$year)
+
+abcpit$Count<-as.numeric(abcpit$number)
+rentals$Reviews<-as.numeric(rentals$reviews)
+
+housing <- left_join(abcpit, rentals,
+             by=c("Year"))
+
+#write.csv(housing, "housing.csv")
+housing<-read.csv("housing.csv")
+
+
+h<-ggplot(housing, aes(x = Year, y = Count, color = Category))+
+  geom_point(alpha = .9, size=.7) +
+  geom_smooth(size=.5, alpha=.5, fill="beige")+
+  scale_x_continuous(breaks=seq(2010, 2022, 1)) +
+  theme_ipsum()
+
+
+ggplotly(h, tooltip = c("Reviews", "Count"))
+
+
+#dbDisconnect(con)
 ```
 
-### Chart C
 
-```{r}
-
-```
 
